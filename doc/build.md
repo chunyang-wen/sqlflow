@@ -1,4 +1,4 @@
-# Canonical Development Environment Setup
+# Build from Source in a Docker Container
 
 Referring to [this example](https://github.com/wangkuiyi/canonicalize-go-python-grpc-dev-env),
 we create a canonical dev environment for Go and Python developers using Docker images.
@@ -45,17 +45,17 @@ cd $GOPATH/src/github.com/sql-machine-learning/sqlflow
 go get -u -t ./...
 ```
 
-To build the project, we need protobuf compiler, Go compiler, Python interpreter and gRPC extension to protobuf compiler. To prepare our dev environment with these tools, the easist way is to pull latest image from DockerHub by running command below and give it an alias sqlflow:dev. Alternatively, we provide a Dockerfile where can build image from. Note it will take a while to build from Dockerfile, especialy when the network is unpredictable. 
+To build the project, we need protobuf compiler, Go compiler, Python interpreter and gRPC extension to protobuf compiler. To prepare our dev environment with these tools, the easist way is to pull latest image from DockerHub by running command below and give it an alias sqlflow:latest. Alternatively, we provide a Dockerfile where can build image from. Note it will take a while to build from Dockerfile, especially when the network is unpredictable.
 
 ```bash
-docker pull sqlflow/sqlflow:dev
-docker tag sqlflow/sqlflow:dev sqlflow:dev
+docker pull sqlflow/sqlflow:latest
+docker tag sqlflow/sqlflow:latest sqlflow:latest
 ```
 
 or
 
 ```bash
-docker build -t sqlflow:dev -f Dockerfile.dev .
+docker build -t sqlflow:latest .
 ```
 
 ## Development
@@ -69,7 +69,7 @@ the `$GOPATH` in the container:
 ```bash
 docker run --rm -it -v $GOPATH:/go \
     -w /go/src/github.com/sql-machine-learning/sqlflow \
-    sqlflow:dev bash
+    sqlflow:latest bash
 ```
 
 Inside the Docker container, start a MySQL server in the background
@@ -82,33 +82,15 @@ run all the tests as
 
 ```
 go generate ./...
-go install ./...
 go test -v ./...
 ```
 
 where `go generate` invokes the `protoc` command to translate `server/sqlflow.proto`
 into `server/sqlflow.pb.go` and `go test -v` builds and run unit tests.
 
-
-### Release
-
-The above build process currently generates two binary files in
-`$GOPATH/bin` on the host.  To package them into a Docker image,
-please run
-
-```bash
-docker build -t sqlflow -f ./Dockerfile $GOPATH/bin
-```
-
-To publish the released Docker image to our official DockerHub
-```bash
-docker tag sqlflow sqlflow/sqlflow:latest
-docker push sqlflow/sqlflow:latest
-```
-
 ## Demo: Command line Prompt
 
-The demo requires a MySQL server instance with populated data. If we don't, we could
+The demo requires a MySQL server instance with populated data. If you don't, please
 follow [example/datasets/README.md](/example/datasets/README.md) to start one on the host.
 After setting up MySQL, run the following inside the Docker container
 

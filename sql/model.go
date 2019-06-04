@@ -1,3 +1,16 @@
+// Copyright 2019 The SQLFlow Authors. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package sql
 
 import (
@@ -19,9 +32,9 @@ type model struct {
 // SQLFlow working directory, which contains the TensorFlow working
 // directory and the trained TenosrFlow model.
 func (m *model) save(db *DB, table string) (e error) {
-	sqlf, e := sqlfs.Create(db.DB, table)
+	sqlf, e := sqlfs.Create(db.DB, db.driverName, table)
 	if e != nil {
-		return fmt.Errorf("Cannot create sqlfs file %s: %v", table, e)
+		return fmt.Errorf("cannot create sqlfs file %s: %v", table, e)
 	}
 	defer sqlf.Close()
 
@@ -37,7 +50,13 @@ func (m *model) save(db *DB, table string) (e error) {
 
 	cmd := exec.Command("tar", "czf", "-", "-C", m.workDir, ".")
 	cmd.Stdout = sqlf
-	return cmd.Run()
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
+
+	if e := cmd.Run(); e != nil {
+		return fmt.Errorf("tar stderr: %v\ntar cmd %v", errBuf.String(), e)
+	}
+	return nil
 }
 
 // load reads from the given sqlfs table for the train select
@@ -46,13 +65,13 @@ func (m *model) save(db *DB, table string) (e error) {
 func load(db *DB, table, cwd string) (m *model, e error) {
 	sqlf, e := sqlfs.Open(db.DB, table)
 	if e != nil {
-		return nil, fmt.Errorf("Cannot open sqlfs file %s: %v", table, e)
+		return nil, fmt.Errorf("cannot open sqlfs file %s: %v", table, e)
 	}
 	defer sqlf.Close()
 
 	var buf bytes.Buffer
 	if _, e := buf.ReadFrom(sqlf); e != nil {
-		return nil, e
+		return nil, fmt.Errorf("buf.ReadFrom %v", e)
 	}
 	m = &model{}
 	if e := gob.NewDecoder(&buf).Decode(m); e != nil {
@@ -61,5 +80,9 @@ func load(db *DB, table, cwd string) (m *model, e error) {
 
 	cmd := exec.Command("tar", "xzf", "-", "-C", cwd)
 	cmd.Stdin = &buf
-	return m, cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("tar %v", string(output))
+	}
+	return m, nil
 }
